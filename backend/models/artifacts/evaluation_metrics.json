@@ -1,0 +1,15 @@
+{
+  "n_patients": 4500,
+  "n_test": 900,
+  "mace_prevalence_pct": 28.4,
+  "auc_static_baseline": 0.6441,
+  "auc_xgboost": 0.8982,
+  "auc_lstm": 0.898,
+  "auc_hybrid": 0.9003,
+  "brier_static_baseline": 0.2645,
+  "brier_hybrid": 0.0728,
+  "fpr_at_80pct_sens_static": 0.604,
+  "fpr_at_80pct_sens_hybrid": 0.0357,
+  "false_positive_reduction_pct": 94.09,
+  "hybrid_80pct_sens_threshold": 0.419
+}

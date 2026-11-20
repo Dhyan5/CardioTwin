@@ -1,8 +1,12 @@
 name = "cardiotwin"
+main = "worker/index.ts"
 compatibility_date = "2026-01-01"
-pages_build_output_dir = "dist"
+
+[assets]
+directory = "./dist"
+binding = "ASSETS"
+not_found_handling = "single-page-application"
 
 [vars]
-# Set this to your deployed FastAPI backend URL in the Cloudflare Pages dashboard
-# e.g. https://cardiotwin-api.onrender.com or https://cardiotwin-api.fly.dev
+# Set this to your deployed FastAPI backend URL in the Cloudflare Workers dashboard
 TWIN_API_URL = "https://cardiotwin-api.onrender.com"

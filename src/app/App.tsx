@@ -21,8 +21,6 @@ const AnalyticsPage = lazy(() => import('../pages/AnalyticsPage'));
 const DoctorPortalPage = lazy(() => import('../pages/DoctorPortalPage'));
 const AdminPortalPage = lazy(() => import('../pages/AdminPortalPage'));
 
-import CustomCursor from '../components/CustomCursor';
-
 const queryClient = new QueryClient();
 
 // Loading spinner fallback shown between route transitions
@@ -56,10 +54,6 @@ export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
-        {/* Global Premium Portfolio Cursor & Noise Overlay */}
-        <CustomCursor />
-        <div className="noise-overlay" />
-
         <Suspense fallback={<PageLoader />}>
           <Routes>
             {/* Public Pages */}

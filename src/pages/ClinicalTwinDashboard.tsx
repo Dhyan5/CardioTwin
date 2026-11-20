@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   HeartPulse,
   Moon,
@@ -9,12 +9,14 @@ import {
   X,
 } from 'lucide-react';
 import { twinApi } from '../services/twinApi';
+import { twinFallback } from '../services/twinFallback';
 import {
   MedicationPlan,
   ModelMetrics,
   PatientSummary,
   RiskFlag,
   TwinDashboardResponse,
+  TwinVector,
   WhatIfComparisonResponse,
 } from '../types/twin';
 import TwinStateGrid from '../components/twin/TwinStateGrid';
@@ -44,21 +46,34 @@ export default function ClinicalTwinDashboard() {
   const [loading, setLoading] = useState<boolean>(true);
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
   const [isSimulating, setIsSimulating] = useState<boolean>(false);
+  const [isTwinModified, setIsTwinModified] = useState<boolean>(false);
+  const [originalDashboard, setOriginalDashboard] = useState<TwinDashboardResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Vitals Ingest Modal state
   const [ingestOpen, setIngestOpen] = useState<boolean>(false);
   const [ingestForm, setIngestForm] = useState<Record<string, string>>({});
 
   const runSimulation = useCallback(
-    async (patientId: string, current: MedicationPlan, proposed: MedicationPlan) => {
+    async (
+      patientId: string,
+      current: MedicationPlan,
+      proposed: MedicationPlan,
+      baselineVector?: TwinVector,
+    ) => {
       setIsSimulating(true);
       try {
-        const res = await twinApi.simulateWhatIf(patientId, 90, [
-          { plan_id: 'no_treatment', label: 'No Treatment', medications: EMPTY_PLAN },
-          { plan_id: 'current_plan', label: 'Current Plan', medications: current },
-          { plan_id: 'proposed_plan', label: 'Proposed Plan', medications: proposed },
-        ]);
+        const res = await twinApi.simulateWhatIf(
+          patientId,
+          90,
+          [
+            { plan_id: 'no_treatment', label: 'No Treatment', medications: EMPTY_PLAN },
+            { plan_id: 'current_plan', label: 'Current Plan', medications: current },
+            { plan_id: 'proposed_plan', label: 'Proposed Plan', medications: proposed },
+          ],
+          baselineVector,
+        );
         setSimulation(res);
       } catch (err: any) {
         setError(err.message || 'Failed to run 90-day projection');
@@ -79,6 +94,8 @@ export default function ClinicalTwinDashboard() {
           modelMetrics ? Promise.resolve(modelMetrics) : twinApi.getModelMetrics(),
         ]);
         setDashboard(data);
+        setOriginalDashboard(data);
+        setIsTwinModified(false);
         setModelMetrics(metrics);
 
         // Pre-populate proposed plan with an optimized GDMT suggestion above current plan
@@ -144,6 +161,50 @@ export default function ClinicalTwinDashboard() {
       cancelled = true;
     };
   }, [dashboard, proposedPlan]);
+
+  const handleUpdateTwinField = (field: keyof TwinVector, value: number | string | boolean) => {
+    if (!dashboard) return;
+    const rawVector: TwinVector = {
+      ...dashboard.twin_state.vector,
+      [field]: value,
+    };
+    const { vector, statuses, prediction } = twinFallback.recomputeVectorAndStatus(rawVector);
+
+    setIsTwinModified(true);
+    setDashboard({
+      ...dashboard,
+      twin_state: {
+        ...dashboard.twin_state,
+        source: 'interactive_study',
+        vector,
+        statuses,
+      },
+      prediction,
+    });
+
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(async () => {
+      try {
+        const livePred = await twinApi.predict(vector);
+        setDashboard((prev) => (prev ? { ...prev, prediction: livePred } : prev));
+        await runSimulation(selectedPatientId, dashboard.active_medications, proposedPlan, vector);
+      } catch {
+        // Keep immediate local recompute if backend call fails
+      }
+    }, 220);
+  };
+
+  const handleResetTwin = async () => {
+    if (!originalDashboard) return;
+    setDashboard(originalDashboard);
+    setIsTwinModified(false);
+    await runSimulation(
+      selectedPatientId,
+      originalDashboard.active_medications,
+      proposedPlan,
+      originalDashboard.twin_state.vector,
+    );
+  };
 
   const handleManualRefresh = async () => {
     setIsRefreshing(true);
@@ -299,7 +360,12 @@ export default function ClinicalTwinDashboard() {
               <>
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-stretch">
                   <div className="lg:col-span-8">
-                    <TwinStateGrid twinState={dashboard.twin_state} />
+                    <TwinStateGrid
+                      twinState={dashboard.twin_state}
+                      onUpdateField={handleUpdateTwinField}
+                      onResetTwin={handleResetTwin}
+                      isModified={isTwinModified}
+                    />
                   </div>
                   <div className="lg:col-span-4 flex">
                     <div className="w-full">
@@ -318,7 +384,12 @@ export default function ClinicalTwinDashboard() {
                   onChangeProposed={setProposedPlan}
                   onResetProposed={() => setProposedPlan(dashboard.active_medications)}
                   onRunProjection={() =>
-                    runSimulation(selectedPatientId, dashboard.active_medications, proposedPlan)
+                    runSimulation(
+                      selectedPatientId,
+                      dashboard.active_medications,
+                      proposedPlan,
+                      dashboard.twin_state.vector,
+                    )
                   }
                   isSimulating={isSimulating}
                   simulationResult={simulation}

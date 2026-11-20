@@ -1,14 +1,17 @@
 import React from 'react';
-import { Activity, AlertCircle, CheckCircle2, AlertTriangle } from 'lucide-react';
-import { FieldStatus, TWIN_SCHEMA, TwinState } from '../../types/twin';
+import { Activity, AlertCircle, CheckCircle2, AlertTriangle, RotateCcw } from 'lucide-react';
+import { FieldStatus, TWIN_SCHEMA, TwinState, TwinVector } from '../../types/twin';
 
 interface TwinStateGridProps {
   twinState: TwinState;
+  onUpdateField?: (field: keyof TwinVector, value: number | string | boolean) => void;
+  onResetTwin?: () => void;
+  isModified?: boolean;
 }
 
 interface FieldGroup {
   title: string;
-  fields: Array<keyof TwinState['vector']>;
+  fields: Array<keyof TwinVector>;
 }
 
 const FIELD_GROUPS: FieldGroup[] = [
@@ -25,6 +28,22 @@ const FIELD_GROUPS: FieldGroup[] = [
     fields: ['ldl', 'hdl', 'triglycerides', 'bmi'],
   },
 ];
+
+const FIELD_STEPS: Partial<Record<keyof TwinVector, number>> = {
+  heart_rate: 1,
+  systolic_bp: 1,
+  diastolic_bp: 1,
+  ejection_fraction: 1,
+  o2_saturation: 0.5,
+  bnp: 5,
+  troponin: 0.005,
+  creatinine: 0.05,
+  potassium: 0.1,
+  ldl: 2,
+  hdl: 1,
+  triglycerides: 5,
+  bmi: 0.2,
+};
 
 function StatusBadge({ status }: { status: FieldStatus }) {
   if (status === 'critical') {
@@ -59,7 +78,12 @@ function formatNormalRange(fieldKey: string): string {
   return `Ref ${meta.normal_min}–${meta.normal_max}`;
 }
 
-export default function TwinStateGrid({ twinState }: TwinStateGridProps) {
+export default function TwinStateGrid({
+  twinState,
+  onUpdateField,
+  onResetTwin,
+  isModified = false,
+}: TwinStateGridProps) {
   const { vector, statuses, provenance } = twinState;
   const schemaFields = TWIN_SCHEMA.fields as Record<string, any>;
 
@@ -79,13 +103,22 @@ export default function TwinStateGrid({ twinState }: TwinStateGridProps) {
               Unified Digital Twin State Vector
             </h2>
             <p className="text-xs text-slate-500 dark:text-slate-400">
-              Schema v{twinState.schema_version} · Snapshot v{twinState.state_version} · Source:{' '}
-              <span className="font-mono">{twinState.source}</span>
+              Adjust any vital, lab, or risk factor below to study live MACE risk &amp; 90-day outcomes · Schema v{twinState.schema_version} · Snapshot v{twinState.state_version}
             </p>
           </div>
         </div>
 
         <div className="flex items-center gap-2 text-xs">
+          {isModified && onResetTwin && (
+            <button
+              type="button"
+              onClick={onResetTwin}
+              className="inline-flex items-center gap-1 px-2 py-0.5 rounded font-medium border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"
+            >
+              <RotateCcw className="h-3 w-3" aria-hidden="true" />
+              Reset Baseline
+            </button>
+          )}
           {criticalCount > 0 && (
             <span className="px-2 py-0.5 rounded font-medium bg-rose-500/15 text-rose-700 dark:text-rose-300 border border-rose-500/30">
               {criticalCount} Critical
@@ -116,12 +149,15 @@ export default function TwinStateGrid({ twinState }: TwinStateGridProps) {
                 const rawVal = vector[fieldKey] as number;
                 const status: FieldStatus = statuses[fieldKey] || 'normal';
                 const prov = provenance[fieldKey] || 'measured';
-                const formattedVal =
+                const isDerived = Boolean(meta?.derived);
+                const step = FIELD_STEPS[fieldKey] ?? 1;
+                const decimals =
                   fieldKey === 'troponin'
-                    ? rawVal.toFixed(3)
+                    ? 3
                     : fieldKey === 'cardiac_output' || fieldKey === 'potassium' || fieldKey === 'creatinine'
-                      ? rawVal.toFixed(2)
-                      : rawVal.toFixed(1);
+                      ? 2
+                      : 1;
+                const formattedVal = rawVal.toFixed(decimals);
 
                 const borderClass =
                   status === 'critical'
@@ -136,25 +172,60 @@ export default function TwinStateGrid({ twinState }: TwinStateGridProps) {
                     className={`rounded-md border p-3 transition-colors ${borderClass}`}
                   >
                     <div className="flex items-start justify-between gap-2 mb-1.5">
-                      <span className="text-xs font-medium text-slate-700 dark:text-slate-300 leading-tight">
+                      <label
+                        htmlFor={`twin-input-${fieldKey}`}
+                        className="text-xs font-medium text-slate-700 dark:text-slate-300 leading-tight"
+                      >
                         {meta?.label || fieldKey}
-                      </span>
+                      </label>
                       <StatusBadge status={status} />
                     </div>
 
                     <div className="flex items-baseline justify-between gap-2">
                       <div className="flex items-baseline gap-1.5">
-                        <span className="text-xl font-semibold font-mono tabular-nums text-slate-900 dark:text-slate-50">
-                          {formattedVal}
-                        </span>
+                        {onUpdateField && !isDerived ? (
+                          <input
+                            id={`twin-input-${fieldKey}`}
+                            type="number"
+                            min={meta?.physiological_min}
+                            max={meta?.physiological_max}
+                            step={step}
+                            value={Number(formattedVal)}
+                            onChange={(e) => {
+                              const parsed = parseFloat(e.target.value);
+                              if (!Number.isNaN(parsed)) {
+                                onUpdateField(fieldKey, parsed);
+                              }
+                            }}
+                            aria-label={`${meta?.label || fieldKey} value`}
+                            className="w-20 rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-1.5 py-0.5 text-lg font-semibold font-mono tabular-nums text-slate-900 dark:text-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600"
+                          />
+                        ) : (
+                          <span className="text-xl font-semibold font-mono tabular-nums text-slate-900 dark:text-slate-50">
+                            {formattedVal}
+                          </span>
+                        )}
                         <span className="text-xs text-slate-500 dark:text-slate-400">
                           {meta?.unit}
                         </span>
                       </div>
                       <span className="text-[10px] uppercase tracking-wider text-slate-400 dark:text-slate-500 font-mono">
-                        {prov}
+                        {isDerived ? 'derived' : prov}
                       </span>
                     </div>
+
+                    {onUpdateField && !isDerived && meta?.physiological_min !== undefined && (
+                      <input
+                        type="range"
+                        min={meta.physiological_min}
+                        max={meta.physiological_max}
+                        step={step}
+                        value={rawVal}
+                        onChange={(e) => onUpdateField(fieldKey, parseFloat(e.target.value))}
+                        aria-label={`${meta?.label || fieldKey} slider`}
+                        className="mt-2 w-full h-1.5 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none accent-teal-700 dark:accent-teal-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600"
+                      />
+                    )}
 
                     <div className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
                       {formatNormalRange(fieldKey)}
@@ -166,26 +237,72 @@ export default function TwinStateGrid({ twinState }: TwinStateGridProps) {
           </div>
         ))}
 
-        {/* Demographics & Risk Profile Strip */}
-        <div className="pt-2 border-t border-slate-200 dark:border-slate-800 flex flex-wrap gap-x-6 gap-y-2 text-xs text-slate-600 dark:text-slate-300">
-          <div>
-            <span className="text-slate-400 dark:text-slate-500">Age / Sex:</span>{' '}
-            <span className="font-medium font-mono">
-              {vector.age}y / {vector.sex}
-            </span>
+        {/* Interactive Demographics & Risk Profile Controls */}
+        <div className="pt-3 border-t border-slate-200 dark:border-slate-800 flex flex-wrap items-center gap-x-5 gap-y-2 text-xs text-slate-600 dark:text-slate-300">
+          <div className="flex items-center gap-1.5">
+            <label htmlFor="twin-age" className="text-slate-500 dark:text-slate-400">Age:</label>
+            <input
+              id="twin-age"
+              type="number"
+              min={18}
+              max={110}
+              value={vector.age}
+              disabled={!onUpdateField}
+              onChange={(e) => onUpdateField?.('age', Math.max(18, Math.min(110, Number(e.target.value) || 18)))}
+              className="w-14 rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-1.5 py-0.5 font-mono text-xs"
+            />
           </div>
-          <div>
-            <span className="text-slate-400 dark:text-slate-500">Smoking:</span>{' '}
-            <span className="font-medium capitalize">{vector.smoking_status}</span>
+
+          <div className="flex items-center gap-1.5">
+            <label htmlFor="twin-sex" className="text-slate-500 dark:text-slate-400">Sex:</label>
+            <select
+              id="twin-sex"
+              value={vector.sex}
+              disabled={!onUpdateField}
+              onChange={(e) => onUpdateField?.('sex', e.target.value)}
+              className="rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-1.5 py-0.5 text-xs"
+            >
+              <option value="M">M</option>
+              <option value="F">F</option>
+            </select>
           </div>
-          <div>
-            <span className="text-slate-400 dark:text-slate-500">Diabetes:</span>{' '}
-            <span className="font-medium">{vector.diabetes_status ? 'Yes' : 'No'}</span>
+
+          <div className="flex items-center gap-1.5">
+            <label htmlFor="twin-smoking" className="text-slate-500 dark:text-slate-400">Smoking:</label>
+            <select
+              id="twin-smoking"
+              value={vector.smoking_status}
+              disabled={!onUpdateField}
+              onChange={(e) => onUpdateField?.('smoking_status', e.target.value)}
+              className="rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-1.5 py-0.5 text-xs"
+            >
+              <option value="never">Never</option>
+              <option value="former">Former</option>
+              <option value="current">Current</option>
+            </select>
           </div>
-          <div>
-            <span className="text-slate-400 dark:text-slate-500">Family Hx CAD:</span>{' '}
-            <span className="font-medium">{vector.family_history ? 'Positive' : 'Negative'}</span>
-          </div>
+
+          <label className="inline-flex items-center gap-1.5">
+            <input
+              type="checkbox"
+              checked={vector.diabetes_status}
+              disabled={!onUpdateField}
+              onChange={(e) => onUpdateField?.('diabetes_status', e.target.checked)}
+              className="rounded border-slate-300 text-teal-700 focus:ring-teal-600"
+            />
+            <span>Diabetes</span>
+          </label>
+
+          <label className="inline-flex items-center gap-1.5">
+            <input
+              type="checkbox"
+              checked={vector.family_history}
+              disabled={!onUpdateField}
+              onChange={(e) => onUpdateField?.('family_history', e.target.checked)}
+              className="rounded border-slate-300 text-teal-700 focus:ring-teal-600"
+            />
+            <span>Family Hx CAD</span>
+          </label>
         </div>
       </div>
     </section>

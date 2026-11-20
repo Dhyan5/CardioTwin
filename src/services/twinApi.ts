@@ -3,11 +3,12 @@ import {
   ModelMetrics,
   PatientSummary,
   PharmacoAssessment,
+  RiskPrediction,
   TwinDashboardResponse,
   TwinVector,
   WhatIfComparisonResponse,
 } from '../types/twin';
-import { evaluatePharmacoFallback, twinFallback } from './twinFallback';
+import { evaluatePharmacoFallback, predictVector, twinFallback } from './twinFallback';
 
 const rawBase = import.meta.env.VITE_TWIN_API_URL || '/twin-api';
 const TWIN_API_BASE = rawBase.replace(/\/+$/, '');
@@ -83,11 +84,27 @@ export const twinApi = {
     patientId: string,
     horizonDays: number,
     plans: Array<{ plan_id: string; label: string; medications: MedicationPlan }>,
+    baselineVector?: TwinVector,
   ) =>
     twinFetchWithFallback<WhatIfComparisonResponse>(
       '/whatif/simulate',
-      { method: 'POST', body: JSON.stringify({ patient_id: patientId, horizon_days: horizonDays, plans }) },
-      () => twinFallback.simulateWhatIf(patientId, horizonDays, plans),
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          patient_id: patientId,
+          horizon_days: horizonDays,
+          baseline_vector: baselineVector,
+          plans,
+        }),
+      },
+      () => twinFallback.simulateWhatIf(patientId, horizonDays, plans, baselineVector),
+    ),
+
+  predict: (vector: TwinVector) =>
+    twinFetchWithFallback<RiskPrediction>(
+      '/predict',
+      { method: 'POST', body: JSON.stringify({ vector }) },
+      () => predictVector(vector),
     ),
 
   getModelMetrics: () =>

@@ -180,7 +180,7 @@ export default function MedicationSimulatorPanel({
                           value={val}
                           onChange={(e) => handleSliderChange(drugKey, parseFloat(e.target.value))}
                           aria-label={`${meta.generic_name} (${meta.class}) dose in ${meta.unit}`}
-                          className="w-full h-1.5 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-teal-700 dark:accent-teal-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600"
+                          className="w-full h-1.5 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none accent-teal-700 dark:accent-teal-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600"
                         />
                       </div>
                     );

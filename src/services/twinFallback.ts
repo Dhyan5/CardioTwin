@@ -83,7 +83,7 @@ function sigmoid(x: number): number {
   return 1 / (1 + Math.exp(-Math.max(-12, Math.min(12, x))));
 }
 
-function predictVector(v: TwinVector, maceMultiplier = 1.0): RiskPrediction {
+export function predictVector(v: TwinVector, maceMultiplier = 1.0): RiskPrediction {
   const t0 = performance.now();
   const z =
     -4.1 +
@@ -437,9 +437,10 @@ export const twinFallback = {
     patientId: string,
     horizonDays: number,
     plans: Array<{ plan_id: string; label: string; medications: MedicationPlan }>,
+    baselineVector?: TwinVector,
   ): WhatIfComparisonResponse {
     const p = SEED_PATIENTS[patientId] || SEED_PATIENTS['pt-001'];
-    const baseline = p.vector;
+    const baseline = baselineVector || p.vector;
     const days: number[] = [];
     for (let d = 0; d < horizonDays; d += 7) days.push(d);
     if (days[days.length - 1] !== horizonDays) days.push(horizonDays);
@@ -529,6 +530,21 @@ export const twinFallback = {
       fpr_at_80pct_sens_static: 0.604,
       fpr_at_80pct_sens_hybrid: 0.0357,
       false_positive_reduction_pct: 94.09,
+    };
+  },
+
+  recomputeVectorAndStatus(vector: TwinVector): {
+    vector: TwinVector;
+    statuses: Record<string, FieldStatus>;
+    prediction: RiskPrediction;
+  } {
+    const next: TwinVector = { ...vector };
+    next.egfr = computeEgfr(next.creatinine, next.age, next.sex);
+    next.cardiac_output = computeCardiacOutput(next.ejection_fraction, next.heart_rate, next.bmi, next.sex);
+    return {
+      vector: next,
+      statuses: evaluateAllStatuses(next),
+      prediction: predictVector(next),
     };
   },
 };

@@ -11,6 +11,7 @@ import DashboardLayout from '../components/layout/DashboardLayout';
 const LandingPage = lazy(() => import('../pages/LandingPage'));
 const LoginPage = lazy(() => import('../pages/LoginPage'));
 const RegisterPage = lazy(() => import('../pages/RegisterPage'));
+const ClinicalTwinDashboard = lazy(() => import('../pages/ClinicalTwinDashboard'));
 const DashboardPage = lazy(() => import('../pages/DashboardPage'));
 const PredictionWizardPage = lazy(() => import('../pages/PredictionWizardPage'));
 const ChatPage = lazy(() => import('../pages/ChatPage'));
@@ -62,7 +63,9 @@ export default function App() {
         <Suspense fallback={<PageLoader />}>
           <Routes>
             {/* Public Pages */}
-            <Route path="/" element={<LandingPage />} />
+            <Route path="/" element={<ClinicalTwinDashboard />} />
+            <Route path="/twin" element={<ClinicalTwinDashboard />} />
+            <Route path="/landing" element={<LandingPage />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
 

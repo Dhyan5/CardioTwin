@@ -1,5 +1,22 @@
-# HridyaDarpan (हृदय दर्पण) 🫀
-> **AI-Powered Real-Time Cardiovascular Clinical Intelligence Platform & 3D Digital Heart Twin**
+# HridyaDarpan / CardioTwin (हृदय दर्पण) 🫀
+> **Digital Twin-Assisted Heart Disease Prediction & Prevention System**
+
+For the modular **CardioTwin FastAPI + Hybrid XGBoost–LSTM + Pharmacodynamic What-If Simulator** architecture, model evaluation metrics (`AUC 0.9003`, `-94.09%` false positives vs. static baseline), and quickstart instructions, see [backend/README.md](backend/README.md).
+
+### CardioTwin Quickstart
+```bash
+# 1. Backend (FastAPI on port 8000)
+python -m uvicorn backend.api.main:app --host 0.0.0.0 --port 8000 --reload
+
+# 2. Frontend (React + TypeScript on port 5173)
+npm install --legacy-peer-deps
+npm run dev
+
+# 3. Tests (11 unit & integration tests)
+python -m pytest backend/tests -v
+```
+
+---
 
 [![React](https://img.shields.io/badge/React-19.x-blue.svg)](https://react.dev/)
 [![Vite](https://img.shields.io/badge/Vite-6.x-646CFF.svg)](https://vitejs.dev/)

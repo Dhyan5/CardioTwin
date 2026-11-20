@@ -261,8 +261,19 @@ export default function ClinicalTwinDashboard() {
                 </span>{' '}
                 · {dashboard.primary_diagnosis}
               </div>
-              <div className="font-mono text-[11px]">
-                Last fused: {new Date(dashboard.twin_state.timestamp).toLocaleTimeString()} · Auto-refresh 300s
+              <div className="font-mono text-[11px] flex items-center gap-2">
+                <span
+                  className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded border ${
+                    twinApi.isStandaloneMode()
+                      ? 'bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/30'
+                      : 'bg-teal-500/10 text-teal-700 dark:text-teal-300 border-teal-500/30'
+                  }`}
+                >
+                  {twinApi.isStandaloneMode() ? 'Standalone Clinical Engine' : 'Live FastAPI Backend'}
+                </span>
+                <span>
+                  Last fused: {new Date(dashboard.twin_state.timestamp).toLocaleTimeString()} · Auto-refresh 300s
+                </span>
               </div>
             </div>
           )}

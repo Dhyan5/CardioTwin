@@ -8,6 +8,7 @@ interface Env {
 /**
  * Cloudflare Worker entrypoint for CardioTwin:
  * - Proxies `/twin-api/*` to `TWIN_API_URL` (FastAPI backend)
+ * - Normalizes upstream HTML 5xx pages into clean JSON errors
  * - Delegates all other requests to Cloudflare Static Assets (`./dist`)
  */
 export default {
@@ -21,7 +22,7 @@ export default {
           JSON.stringify({
             error: 'TWIN_API_URL is not configured in Cloudflare Worker environment variables.',
           }),
-          { status: 500, headers: { 'Content-Type': 'application/json' } },
+          { status: 503, headers: { 'Content-Type': 'application/json' } },
         );
       }
 
@@ -41,15 +42,49 @@ export default {
         init.body = await request.arrayBuffer();
       }
 
-      const upstream = await fetch(targetUrl, init);
-      const respHeaders = new Headers(upstream.headers);
-      respHeaders.set('Access-Control-Allow-Origin', '*');
+      try {
+        const upstream = await fetch(targetUrl, init);
+        const contentType = upstream.headers.get('content-type') || '';
 
-      return new Response(upstream.body, {
-        status: upstream.status,
-        statusText: upstream.statusText,
-        headers: respHeaders,
-      });
+        if (upstream.status >= 500 && !contentType.includes('application/json')) {
+          return new Response(
+            JSON.stringify({
+              error: `Backend returned HTTP ${upstream.status}`,
+              upstream_url: backendBase,
+            }),
+            {
+              status: upstream.status,
+              headers: {
+                'Content-Type': 'application/json',
+                'Access-Control-Allow-Origin': '*',
+              },
+            },
+          );
+        }
+
+        const respHeaders = new Headers(upstream.headers);
+        respHeaders.set('Access-Control-Allow-Origin', '*');
+
+        return new Response(upstream.body, {
+          status: upstream.status,
+          statusText: upstream.statusText,
+          headers: respHeaders,
+        });
+      } catch (err: any) {
+        return new Response(
+          JSON.stringify({
+            error: 'Failed to reach backend service',
+            detail: err?.message || 'Network error',
+          }),
+          {
+            status: 502,
+            headers: {
+              'Content-Type': 'application/json',
+              'Access-Control-Allow-Origin': '*',
+            },
+          },
+        );
+      }
     }
 
     return env.ASSETS.fetch(request);

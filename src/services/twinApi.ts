@@ -8,7 +8,8 @@ import {
   WhatIfComparisonResponse,
 } from '../types/twin';
 
-const TWIN_API_BASE = import.meta.env.VITE_TWIN_API_URL || '/twin-api';
+const rawBase = import.meta.env.VITE_TWIN_API_URL || '/twin-api';
+const TWIN_API_BASE = rawBase.replace(/\/+$/, '');
 
 async function twinFetch<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${TWIN_API_BASE}${path}`, {

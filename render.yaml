@@ -1,4 +1,19 @@
 services:
+  # 0. CardioTwin Digital Twin & Hybrid XGBoost-LSTM FastAPI Backend
+  - type: web
+    name: cardiotwin-api
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: .
+    plan: free
+    region: oregon
+    healthCheckPath: /health
+    envVars:
+      - key: PORT
+        value: 8000
+      - key: DATABASE_URL
+        sync: false # Optional: PostgreSQL URL (defaults to SQLite if unset)
+
   # 1. FastAPI ML Microservice (5 Production Models)
   - type: web
     name: hridayadarpana-ai

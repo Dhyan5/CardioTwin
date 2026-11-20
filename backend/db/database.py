@@ -16,10 +16,20 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, rela
 
 from backend.twin.schema import TwinState
 
-DEFAULT_DB_URL = os.getenv("DATABASE_URL", "sqlite:///./backend/cardiotwin.db")
+def _normalize_db_url(url: str) -> str:
+    # Render/Heroku/Railway often provide postgres:// which SQLAlchemy 2.0 rejects
+    if url.startswith("postgres://"):
+        return url.replace("postgres://", "postgresql+psycopg2://", 1)
+    if url.startswith("postgresql://") and "+psycopg" not in url:
+        return url.replace("postgresql://", "postgresql+psycopg2://", 1)
+    return url
+
+
+DEFAULT_DB_URL = _normalize_db_url(os.getenv("DATABASE_URL", "sqlite:///./backend/cardiotwin.db"))
 
 
 def _build_engine(db_url: str = DEFAULT_DB_URL):
+    db_url = _normalize_db_url(db_url)
     connect_args = {"check_same_thread": False} if db_url.startswith("sqlite") else {}
     return create_engine(db_url, connect_args=connect_args, pool_pre_ping=True)
 

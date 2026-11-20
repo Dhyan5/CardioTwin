@@ -1,0 +1,50 @@
+version: '3.9'
+
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: cardiotwin-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-cardiotwin_dev_pass}
+      POSTGRES_DB: cardiotwin
+    ports:
+      - "5432:5432"
+    volumes:
+      - cardiotwin_pgdata:/var/lib/postgresql/data
+      - ./backend/db/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d cardiotwin"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  cardiotwin-api:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: cardiotwin-api
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      PORT: 8000
+      DATABASE_URL: postgresql+psycopg2://postgres:${POSTGRES_PASSWORD:-cardiotwin_dev_pass}@db:5432/cardiotwin
+    depends_on:
+      db:
+        condition: service_healthy
+
+  cardiotwin-web:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    container_name: cardiotwin-web
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    depends_on:
+      - cardiotwin-api
+
+volumes:
+  cardiotwin_pgdata:

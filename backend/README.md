@@ -43,6 +43,31 @@ python -m backend.models.train
 python -m pytest backend/tests -v
 ```
 
+## Multi-Platform Deployment
+
+### 1. Deploy Backend (FastAPI + XGBoost + PyTorch)
+- **Render**: Use the root [render.yaml](../render.yaml) (`cardiotwin-api` Docker service).
+- **Railway**: Connect the repo; [railway.toml](../railway.toml) automatically builds `backend/Dockerfile` and checks `/health`.
+- **Fly.io**: Run `fly launch --copy-config` using [fly.toml](../fly.toml).
+- **Google Cloud Run**:
+  ```bash
+  gcloud builds submit --tag gcr.io/<PROJECT_ID>/cardiotwin-api -f backend/Dockerfile .
+  gcloud run deploy cardiotwin-api --image gcr.io/<PROJECT_ID>/cardiotwin-api --port 8000 --allow-unauthenticated
+  ```
+- **Docker Compose (Full Stack + PostgreSQL)**:
+  ```bash
+  docker compose -f docker-compose.cardiotwin.yml up --build
+  ```
+
+### 2. Deploy Frontend (Cloudflare Pages, Vercel, Netlify)
+- **Cloudflare Pages** (with built-in `/twin-api/*` edge proxy):
+  - Build command: `npm install --legacy-peer-deps && npm run build`
+  - Build output directory: `dist`
+  - Environment variable: set `TWIN_API_URL` (e.g. `https://cardiotwin-api.onrender.com`) in Cloudflare Pages Settings; [functions/twin-api/[[path]].ts](../functions/twin-api/[[path]].ts) proxies `/twin-api/*` to your backend with zero CORS issues, and [public/_redirects](../public/_redirects) + [wrangler.toml](../wrangler.toml) handle SPA routing.
+  - CLI deploy: `npx wrangler pages deploy dist --project-name cardiotwin`
+- **Vercel**: Connect repo (uses [vercel.json](../vercel.json)) and set `VITE_TWIN_API_URL` to your deployed backend URL.
+- **Netlify**: Connect repo (uses [netlify.toml](../netlify.toml)) and set `VITE_TWIN_API_URL` to your deployed backend URL.
+
 ## Model Evaluation Summary (Held-Out Test Set, n = 900)
 | Model | ROC-AUC | Brier Score | FPR @ 80% Sensitivity |
 |-------|---------|-------------|-----------------------|
